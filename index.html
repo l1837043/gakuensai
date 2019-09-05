@@ -1,0 +1,401 @@
+<html>
+<head>
+ <title>Flappy Bird</title>
+   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="./bootstrap.min.css">
+  <script src="./jquery.min.js"></script>
+  <script src="./bootstrap.min.js"></script>
+ </head>
+<style>
+
+	#chon_chu_de {
+		padding-top: 60px;
+		padding-left: 20px;
+	}
+	
+    #div1 {
+        font-size: 48px;
+    }
+    
+    body {
+        background-image: url("_hinh_nen.gif");
+        background-color: #ffffff;
+    }
+    
+    h2 {
+        text-shadow: 5px 5px 5px #dfd2ec;
+        text-align: center;
+		color: red;
+    }
+    
+    canvas {
+        animation: mymove 5s infinite;
+        border: 5px solid #0a3cda;
+        border-style: dotted;
+        border-radius: 15px 50px;
+    }
+    
+    @keyframes mymove {
+        50% {
+            box-shadow: 10px 20px 30px blue;
+        }
+    }
+</style>
+
+<script>
+		
+		var FPS = 40;
+		var jump_amount = -10;
+		var max_fall_speed = +10;
+		var acceleration = 1;
+		var pipe_speed = -2;
+		var game_mode = 'prestart';
+		var time_game_last_running;
+		var bottom_bar_offset = 0;
+		var pipes = [];
+		var score_all = 0;
+		var ong_cong_tmp = "ong_cong.png";
+</script>
+
+<body>
+	<div style="position:relative">
+		<div id="chon_chu_de" style="float:left; width: 300px; height: 95%;">
+			<!-- block1 -->
+			<div style="background-color: #ffffff;">
+			<input type="radio" name="chu_de" value="mua_dong" onclick="chon_chu_de();" checked>冬コース</input><br>
+			<input type="radio" name="chu_de" value="mua_xuan" onclick="chon_chu_de();">春コース</input><br>
+			<input type="radio" name="chu_de" value="mua_he" onclick="chon_chu_de();">夏コース</input><br>
+			<input type="radio" name="chu_de" value="mua_thu" onclick="chon_chu_de();">秋コース</input><br>
+			</div>
+		</div>
+		<div style="float:left; width: 350px; height: 95%">
+			<!-- block2 -->
+			<center>
+			<h2> 点数： <span id="diem_all">0</span></h2>
+				<canvas id="myCanvas" width=320 height=440 style="background:url('backgroud_winter.gif');  background-size: 100%; height: 95% " </canvas>
+			</center>
+		</div>
+		<div style="float:left; width: 100px; height: 95%">
+			<!-- block2 -->
+		</div>
+	</div>
+    
+    <script>
+		var ctx = myCanvas.getContext("2d");
+		
+		function chon_chu_de() {
+			var chu_de = document.querySelector('input[name="chu_de"]:checked').value;
+			switch (chu_de) {
+                case 'mua_dong':
+                    {
+                        //document.body.style.backgroundImage = "url(hinh_nen1.png)";
+						ong_cong_tmp = "ong_cong.png";
+						document.getElementById("myCanvas").style.backgroundImage = "url(backgroud_winter.gif)";
+						reset_game();
+                        break;
+                    }
+                case 'mua_xuan':
+                    {
+                        //document.body.style.backgroundImage = "url(hinh_nen2.png)";
+						ong_cong_tmp = "ong_cong2.png";
+						document.getElementById("myCanvas").style.backgroundImage = "url(spring.gif)";
+						reset_game();
+                        break;
+                    }
+                case 'mua_he':
+                    {
+                        //document.body.style.backgroundImage = "url(hinh_nen1.png)";
+						ong_cong_tmp = "ong_cong.png";
+						document.getElementById("myCanvas").style.backgroundImage = "url(summer.gif)";
+						reset_game();
+                        break;
+                    }
+				case 'mua_thu':
+                    {
+                        //document.body.style.backgroundImage = "url(hinh_nen2.png)";
+						ong_cong_tmp = "ong_cong2.png";
+						document.getElementById("myCanvas").style.backgroundImage = "url(autum.gif)";
+						reset_game();
+                        break;
+                    }	
+            }
+		}
+        function MySprite(img_url) {
+            this.x = 0;
+            this.y = 0;
+            this.visible = true;
+            this.velocity_x = 0;
+            this.velocity_y = 0;
+            this.MyImg = new Image();
+            this.MyImg.src = img_url || '';
+            this.angle = 0;
+            this.flipV = false;
+            this.flipH = false;
+        }
+        MySprite.prototype.Do_Frame_Things = function() {
+            ctx.save();
+            ctx.translate(this.x + this.MyImg.width / 2, this.y + this.MyImg.height / 2);
+            ctx.rotate(this.angle * Math.PI / 180);
+            if (this.flipV) ctx.scale(1, -1);
+            if (this.flipH) ctx.scale(-1, 1);
+            if (this.visible) ctx.drawImage(this.MyImg, -this.MyImg.width / 2, -this.MyImg.height / 2);
+            this.x = this.x + this.velocity_x;
+            this.y = this.y + this.velocity_y;
+            ctx.restore();
+        }
+
+        function ImagesTouching(thing1, thing2) {
+            if (!thing1.visible || !thing2.visible) return false;
+            if (thing1.x >= thing2.x + thing2.MyImg.width || thing1.x + thing1.MyImg.width <= thing2.x) return false;
+            if (thing1.y >= thing2.y + thing2.MyImg.height || thing1.y + thing1.MyImg.height <= thing2.y) return false;
+            return true;
+        }
+
+        function Got_Player_Input(MyEvent) {
+            switch (game_mode) {
+                case 'prestart':
+                    {
+                        game_mode = 'running';
+                        break;
+                    }
+                case 'running':
+                    {
+                        bird.velocity_y = jump_amount;
+						document.getElementById( "diem_all" ).innerHTML = tinh_diem();
+                        break;
+                    }
+                case 'over':
+                    if (new Date() - time_game_last_running > 1000) {
+                        reset_game();
+                        game_mode = 'running';
+                        break;
+                    }
+            }
+            MyEvent.preventDefault();
+        }
+        myCanvas.addEventListener("touchstart", Got_Player_Input);
+        myCanvas.addEventListener("mousedown", Got_Player_Input);
+        //myCanvas.addEventListener("keydown", Got_Player_Input);
+
+        function make_bird_slow_and_fall() {
+            if (bird.velocity_y < max_fall_speed) {
+                bird.velocity_y = bird.velocity_y + acceleration;
+            }
+            if (bird.y > myCanvas.height - bird.MyImg.height) {
+                bird.velocity_y = 0;
+                game_mode = 'over';
+            }
+        }
+
+        function add_pipe(x_pos, top_of_gap, gap_width) {
+            var top_pipe = new MySprite();
+            top_pipe.MyImg = pipe_piece;
+            top_pipe.x = x_pos;
+            top_pipe.y = top_of_gap - pipe_piece.height;
+            top_pipe.velocity_x = pipe_speed;
+            pipes.push(top_pipe);
+            var bottom_pipe = new MySprite();
+            bottom_pipe.MyImg = pipe_piece;
+            bottom_pipe.flipV = true;
+            bottom_pipe.x = x_pos;
+            bottom_pipe.y = top_of_gap + gap_width;
+            bottom_pipe.velocity_x = pipe_speed;
+            pipes.push(bottom_pipe);
+        }
+
+        function make_bird_tilt_appropriately() {
+            if (bird.velocity_y < 0) {
+                bird.angle = -15;
+            } else if (bird.angle < 70) {
+                bird.angle = bird.angle + 4;
+            }
+        }
+
+        function show_the_pipes() {
+            for (var i = 0; i < pipes.length; i++) {
+                pipes[i].Do_Frame_Things();
+            }
+        }
+
+        function check_for_end_game() {
+            for (var i = 0; i < pipes.length; i++)
+                if (ImagesTouching(bird, pipes[i])) game_mode = "over";
+        }
+
+        function display_intro_instructions() {
+            ctx.font = "25px Arial";
+            ctx.fillStyle = "red";
+            ctx.textAlign = "center";
+            ctx.fillText("クリックして始める", myCanvas.width / 2, myCanvas.height / 4);
+        }
+
+        function display_game_over() {
+            score_all = tinh_diem();
+            ctx.font = "30px Arial";
+            ctx.fillStyle = "red";
+            ctx.textAlign = "center";
+            ctx.fillText("ゲーム終了", myCanvas.width / 2, 100);
+            ctx.fillText("点数: " + score_all, myCanvas.width / 2, 150);
+            ctx.font = "20px Arial";
+            ctx.fillText("クリックして始める", myCanvas.width / 2, 300);
+        }
+		
+		function tinh_diem() {
+			var score = 0;
+			for (var i = 0; i < pipes.length; i++)
+                if (pipes[i].x < bird.x) score = score + 0.5;
+			return score;
+		}
+
+        function display_bar_running_along_bottom() {
+            if (bottom_bar_offset < -23) bottom_bar_offset = 0;
+            ctx.drawImage(bottom_bar, bottom_bar_offset, myCanvas.height - bottom_bar.height);
+        }
+
+        function reset_game() {
+            bird.y = myCanvas.height / 2;
+            bird.angle = 0;
+            pipes = []; // xoa tat ca cac cot
+            add_all_my_pipes(); // xoa cac vi tri cot
+        }
+		
+		function rand_pipe_add() {
+			var random_pipe = Math.floor((Math.random() * 10) + 1); 
+			switch (random_pipe){
+			  case 1:
+				pipe_add1();
+				break;
+			  case 2:
+				pipe_add2();
+				break;
+			  case 3:
+				pipe_add3();
+				break;	
+			  case 4:
+				pipe_add1();
+				break;
+		      case 5:
+				pipe_add2();
+				break;
+		      case 6:
+				pipe_add3();
+				break;
+			  case 7:
+				pipe_add1();
+				break;
+			  case 8:
+				pipe_add2();
+				break;
+			  case 9:
+				pipe_add3();
+				break;	
+			  case 10:
+				pipe_add1();
+				break;
+			}
+
+			console.log(random_pipe);
+		
+		}
+		
+		function pipe_add1() {
+			add_pipe(500, 100, 140);
+            add_pipe(800, 50, 140);
+            add_pipe(1000, 250, 140);
+            add_pipe(1200, 150, 120);
+            add_pipe(1600, 100, 120);
+            add_pipe(1800, 150, 120);
+            add_pipe(2000, 200, 120);
+            add_pipe(2200, 250, 120);
+            add_pipe(2400, 30, 100);
+            add_pipe(2700, 300, 100);
+            add_pipe(3000, 100, 80);
+            add_pipe(3300, 250, 80);
+            add_pipe(3600, 50, 60);
+		}
+		
+		function pipe_add2() {
+			add_pipe(1200, 150, 120);
+			add_pipe(500, 100, 140);
+            add_pipe(800, 50, 140);
+            add_pipe(1000, 250, 140);
+            add_pipe(2200, 250, 120);
+            add_pipe(1600, 100, 120);
+            add_pipe(3000, 100, 80);
+            add_pipe(2000, 200, 120);
+            add_pipe(1800, 150, 120);
+            add_pipe(2400, 30, 100);
+            add_pipe(2700, 300, 100);
+            add_pipe(3600, 50, 60);
+            add_pipe(3300, 250, 80);
+            
+		}
+		
+		function pipe_add3() {
+			add_pipe(2200, 250, 120);
+			add_pipe(1800, 150, 120);
+			add_pipe(1200, 150, 120);
+			add_pipe(500, 100, 140);
+			add_pipe(800, 50, 140);
+            add_pipe(1000, 250, 140);
+            add_pipe(3300, 250, 80);
+            add_pipe(2700, 300, 100);
+            add_pipe(3000, 100, 80);
+            add_pipe(2000, 200, 120);
+            add_pipe(1600, 100, 120);
+            add_pipe(2400, 30, 100);
+            add_pipe(3600, 50, 60);
+		}
+
+        function add_all_my_pipes() {
+			rand_pipe_add();
+            var finish_line = new MySprite("flappyend.png");
+            finish_line.x = 3900;
+            finish_line.velocity_x = pipe_speed;
+            pipes.push(finish_line);
+        }
+        var pipe_piece = new Image();
+        pipe_piece.onload = add_all_my_pipes;
+        pipe_piece.src = ong_cong_tmp;
+
+        function Do_a_Frame() {
+            ctx.clearRect(0, 0, myCanvas.width, myCanvas.height);
+            bird.Do_Frame_Things();
+            display_bar_running_along_bottom();
+            switch (game_mode) {
+                case 'prestart':
+                    {
+                        display_intro_instructions();
+                        break;
+                    }
+                case 'running':
+                    {
+                        time_game_last_running = new Date();
+                        bottom_bar_offset = bottom_bar_offset + pipe_speed;
+                        show_the_pipes();
+                        make_bird_tilt_appropriately();
+                        make_bird_slow_and_fall();
+                        check_for_end_game();
+                        break;
+                    }
+                case 'over':
+                    {
+                        make_bird_slow_and_fall();
+                        display_game_over();
+                        break;
+                    }
+            }
+        }
+        var bottom_bar = new Image();
+        bottom_bar.src = "flappybottom.png";
+
+        var bird = new MySprite("chym_dien.png");
+        bird.x = myCanvas.width / 3;
+        bird.y = myCanvas.height / 2;
+
+        setInterval(Do_a_Frame, 1000 / FPS);
+    </script>
+</body>
+
+</html>
